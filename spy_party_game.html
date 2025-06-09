@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spy - Party Game</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.3/qrcode.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+
+        .container {
+            max-width: 800px;
+            width: 90%;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .screen {
+            display: none;
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        .screen.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        button {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            border: none;
+            color: white;
+            padding: 1rem 2rem;
+            font-size: 1.1rem;
+            border-radius: 50px;
+            cursor: pointer;
+            margin: 0.5rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        input {
+            padding: 1rem;
+            font-size: 1.1rem;
+            border: none;
+            border-radius: 10px;
+            margin: 0.5rem;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+        }
+
+        .game-code {
+            font-size: 2rem;
+            font-weight: bold;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 1rem;
+            border-radius: 10px;
+            margin: 1rem 0;
+            letter-spacing: 0.2em;
+        }
+
+        .players-list {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 1rem;
+            margin: 1rem 0;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .player-item {
+            padding: 0.5rem;
+            margin: 0.25rem 0;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+        }
+
+        .role-card {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 15px;
+            padding: 2rem;
+            margin: 1rem 0;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .spy-card {
+            background: linear-gradient(45deg, #ff4757, #c44569);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .timer {
+            font-size: 3rem;
+            font-weight: bold;
+            margin: 1rem 0;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .timer.warning {
+            color: #ff4757;
+            animation: shake 0.5s infinite;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        .voting-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+
+        .vote-button {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 1rem;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .vote-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.05);
+        }
+
+        .vote-button.selected {
+            background: #ff6b6b;
+            border-color: #ff4757;
+        }
+
+        .scores {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+
+        .score-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 1rem;
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .settings {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 0.5rem 0;
+        }
+
+        #qrcode {
+            background: white;
+            padding: 1rem;
+            border-radius: 10px;
+            margin: 1rem auto;
+            display: inline-block;
+        }
+
+        .reveal-animation {
+            animation: reveal 1s ease-out;
+        }
+
+        @keyframes reveal {
+            0% { opacity: 0; transform: scale(0.8) rotateY(-90deg); }
+            100% { opacity: 1; transform: scale(1) rotateY(0deg); }
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .timer {
+                font-size: 2rem;
+            }
+            
+            .voting-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Home Screen -->
+        <div id="home-screen" class="screen active">
+            <h1>🕵️ SPY</h1>
+            <p style="font-size: 1.2rem; margin-bottom: 2rem;">The Ultimate Social Deduction Game</p>
+            <button onclick="showScreen('create-game')">Create Game</button>
+            <button onclick="showScreen('join-game')">Join Game</button>
+        </div>
+
+        <!-- Create Game Screen -->
+        <div id="create-game" class="screen">
+            <h1>Create Game</h1>
+            <input type="text" id="host-name" placeholder="Enter your name" maxlength="20">
+            <div class="settings">
+                <div class="setting-row">
+                    <span>Game Timer:</span>
+                    <select id="timer-setting">
+                        <option value="60">1 minute</option>
+                        <option value="120" selected>2 minutes</option>
+                        <option value="180">3 minutes</option>
+                        <option value="240">4 minutes</option>
+                        <option value="300">5 minutes</option>
+                    </select>
+                </div>
+            </div>
+            <button onclick="createGame()">Create Game</button>
+            <button onclick="showScreen('home-screen')">Back</button>
+        </div>
+
+        <!-- Join Game Screen -->
+        <div id="join-game" class="screen">
+            <h1>Join Game</h1>
+            <input type="text" id="player-name" placeholder="Enter your name" maxlength="20">
+            <input type="text" id="game-code-input" placeholder="Enter game code" maxlength="6">
+            <button onclick="joinGame()">Join Game</button>
+            <button onclick="showScreen('home-screen')">Back</button>
+        </div>
+
+        <!-- Lobby Screen -->
+        <div id="lobby" class="screen">
+            <h1>Game Lobby</h1>
+            <div class="game-code" id="display-code"></div>
+            <div id="qrcode"></div>
+            <div class="players-list" id="players-list"></div>
+            <div id="host-controls" style="display: none;">
+                <button onclick="startGame()" id="start-button" disabled>Start Game (Need 3+ players)</button>
+            </div>
+            <button onclick="leaveGame()">Leave Game</button>
+        </div>
+
+        <!-- Role Screen -->
+        <div id="role-screen" class="screen">
+            <h1>Your Role</h1>
+            <div id="role-card" class="role-card">
+                <h2 id="role-place"></h2>
+                <h3 id="role-role"></h3>
+            </div>
+            <p id="role-instructions"></p>
+            <div class="timer" id="countdown-timer">15</div>
+            <p>Game starts in...</p>
+        </div>
+
+        <!-- Game Screen -->
+        <div id="game-screen" class="screen">
+            <h1>Discussion Phase</h1>
+            <div class="timer" id="game-timer">2:00</div>
+            <div id="current-players" class="players-list"></div>
+            <p style="margin: 1rem 0;">Discuss and figure out who the spy is!</p>
+            <p style="font-size: 0.9rem; opacity: 0.8;">Ask questions about the location to catch the spy!</p>
+        </div>
+
+        <!-- Voting Screen -->
+        <div id="voting-screen" class="screen">
+            <h1>Vote for the Spy</h1>
+            <p>Who do you think is the spy?</p>
+            <div class="voting-grid" id="voting-options"></div>
+            <button onclick="submitVote()" id="vote-submit" disabled>Submit Vote</button>
+        </div>
+
+        <!-- Results Screen -->
+        <div id="results-screen" class="screen">
+            <h1>Round Results</h1>
+            <div id="spy-reveal" class="role-card reveal-animation">
+                <h2>The Spy Was:</h2>
+                <h3 id="revealed-spy"></h3>
+            </div>
+            <div id="voting-results"></div>
+            <div class="scores" id="current-scores"></div>
+            <div id="host-next" style="display: none;">
+                <button onclick="nextRound()">Next Round</button>
+                <button onclick="endGame()">End Game</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Game data
+        const locations = {
+            "Airport": ["Pilot", "Flight Attendant", "Security Guard", "Passenger", "Baggage Handler", "Air Traffic Controller"],
+            "Hospital": ["Doctor", "Nurse", "Patient", "Surgeon", "Receptionist", "Janitor"],
+            "School": ["Teacher", "Student", "Principal", "Janitor", "Librarian", "Security Guard"],
+            "Restaurant": ["Chef", "Waiter", "Customer", "Manager", "Dishwasher", "Host"],
+            "Bank": ["Teller", "Customer", "Security Guard", "Manager", "Loan Officer", "Janitor"],
+            "Movie Theater": ["Projectionist", "Customer", "Usher", "Manager", "Concession Worker", "Ticket Taker"],
+            "Gym": ["Personal Trainer", "Customer", "Receptionist", "Janitor", "Manager", "Equipment Maintenance"],
+            "Library": ["Librarian", "Student", "Author", "Security Guard", "IT Support", "Janitor"],
+            "Police Station": ["Detective", "Officer", "Suspect", "Dispatcher", "Captain", "Janitor"],
+            "Grocery Store": ["Cashier", "Customer", "Stock Clerk", "Manager", "Security Guard", "Janitor"]
+        };
+
+        // Game state
+        let gameState = {
+            gameCode: '',
+            isHost: false,
+            playerName: '',
+            players: [],
+            currentRole: null,
+            gameTimer: 120,
+            votes: {},
+            scores: {},
+            round: 1,
+            currentSpy: null,
+            gameActive: false
+        };
+
+        // Sound effects
+        function playSound(type) {
+            const context = new (window.AudioContext || window.webkitAudioContext)();
+            let freq = 440;
+            let duration = 0.1;
+            
+            switch(type) {
+                case 'tick': freq = 800; duration = 0.05; break;
+                case 'warning': freq = 400; duration = 0.2; break;
+                case 'reveal': freq = 600; duration = 0.3; break;
+            }
+            
+            const oscillator = context.createOscillator();
+            const gainNode = context.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(context.destination);
+            
+            oscillator.frequency.value = freq;
+            oscillator.type = 'sine';
+            
+            gainNode.gain.setValueAtTime(0.1, context.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, context.currentTime + duration);
+            
+            oscillator.start(context.currentTime);
+            oscillator.stop(context.currentTime + duration);
+        }
+
+        // QR Code generation function
+        function generateQRCode(url) {
+            const qrContainer = document.getElementById('qrcode');
+            
+            // Check if QRCode library is loaded
+            if (typeof QRCode !== 'undefined') {
+                QRCode.toCanvas(qrContainer, url, {width: 200}, function(error) {
+                    if (error) {
+                        console.error('QR Code error:', error);
+                        showFallbackQR(url);
+                    }
+                });
+            } else {
+                // Fallback if QR library fails to load
+                showFallbackQR(url);
+            }
+        }
+        
+        function showFallbackQR(url) {
+            const qrContainer = document.getElementById('qrcode');
+            qrContainer.innerHTML = `
+                <div style="padding: 1rem; background: white; color: #333; border-radius: 10px;">
+                    <p style="margin: 0; font-weight: bold;">Share this link:</p>
+                    <p style="margin: 0.5rem 0; word-break: break-all; font-size: 0.9rem;">${url}</p>
+                    <p style="margin: 0; font-size: 0.8rem; opacity: 0.7;">Players can click this link to join</p>
+                </div>
+            `;
+        }
+
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(screen => {
+                screen.classList.remove('active');
+            });
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        function generateGameCode() {
+            return Math.random().toString(36).substring(2, 8).toUpperCase();
+        }
+
+        function createGame() {
+            const hostName = document.getElementById('host-name').value.trim();
+            if (!hostName) {
+                alert('Please enter your name!');
+                return;
+            }
+
+            gameState.gameCode = generateGameCode();
+            gameState.isHost = true;
+            gameState.playerName = hostName;
+            gameState.players = [hostName];
+            gameState.scores[hostName] = 0;
+            gameState.gameTimer = parseInt(document.getElementById('timer-setting').value);
+
+            document.getElementById('display-code').textContent = gameState.gameCode;
+            document.getElementById('host-controls').style.display = 'block';
+            
+            // Generate QR Code
+            const gameUrl = `${window.location.origin}${window.location.pathname}?code=${gameState.gameCode}`;
+            generateQRCode(gameUrl);
+
+            updatePlayersList();
+            showScreen('lobby');
+        }
+
+        function joinGame() {
+            const playerName = document.getElementById('player-name').value.trim();
+            let gameCode = document.getElementById('game-code-input').value.trim().toUpperCase();
+            
+            // Check URL parameters for game code
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.has('code')) {
+                gameCode = urlParams.get('code').toUpperCase();
+            }
+
+            if (!playerName || !gameCode) {
+                alert('Please enter your name and game code!');
+                return;
+            }
+
+            // Simulate joining game (in real implementation, this would be server-side)
+            gameState.gameCode = gameCode;
+            gameState.playerName = playerName;
+            gameState.players.push(playerName);
+            gameState.scores[playerName] = 0;
+
+            document.getElementById('display-code').textContent = gameCode;
+            document.getElementById('host-controls').style.display = 'none';
+            
+            updatePlayersList();
+            showScreen('lobby');
+        }
+
+        function updatePlayersList() {
+            const playersList = document.getElementById('players-list');
+            playersList.innerHTML = '<h3>Players:</h3>';
+            
+            gameState.players.forEach((player, index) => {
+                const playerDiv = document.createElement('div');
+                playerDiv.className = 'player-item';
+                playerDiv.textContent = `${index + 1}. ${player}`;
+                playersList.appendChild(playerDiv);
+            });
+
+            // Update start button
+            if (gameState.isHost) {
+                const startButton = document.getElementById('start-button');
+                if (gameState.players.length >= 3) {
+                    startButton.disabled = false;
+                    startButton.textContent = 'Start Game';
+                } else {
+                    startButton.disabled = true;
+                    startButton.textContent = `Start Game (Need ${3 - gameState.players.length} more players)`;
+                }
+            }
+        }
+
+        function assignRoles() {
+            const places = Object.keys(locations);
+            const selectedPlace = places[Math.floor(Math.random() * places.length)];
+            const roles = locations[selectedPlace];
+            
+            // Assign spy randomly
+            const spyIndex = Math.floor(Math.random() * gameState.players.length);
+            gameState.currentSpy = gameState.players[spyIndex];
+            
+            gameState.players.forEach((player, index) => {
+                if (index === spyIndex) {
+                    // This player is the spy
+                    if (player === gameState.playerName) {
+                        gameState.currentRole = { role: "Spy" };
+                    }
+                } else {
+                    // Regular player
+                    const randomRole = roles[Math.floor(Math.random() * roles.length)];
+                    if (player === gameState.playerName) {
+                        gameState.currentRole = { place: selectedPlace, role: randomRole };
+                    }
+                }
+            });
+        }
+
+        function startGame() {
+            if (gameState.players.length < 3) {
+                alert('Need at least 3 players to start!');
+                return;
+            }
+
+            assignRoles();
+            showRoleScreen();
+        }
+
+        function showRoleScreen() {
+            const roleCard = document.getElementById('role-card');
+            const rolePlace = document.getElementById('role-place');
+            const roleRole = document.getElementById('role-role');
+            const instructions = document.getElementById('role-instructions');
+
+            if (gameState.currentRole.role === "Spy") {
+                roleCard.classList.add('spy-card');
+                rolePlace.textContent = '🕵️ SECRET AGENT';
+                roleRole.textContent = 'You are the SPY!';
+                instructions.textContent = 'You don\'t know the location. Blend in and avoid detection!';
+            } else {
+                roleCard.classList.remove('spy-card');
+                rolePlace.textContent = `📍 ${gameState.currentRole.place}`;
+                roleRole.textContent = `👤 ${gameState.currentRole.role}`;
+                instructions.textContent = 'Find the spy! Ask questions about the location to catch them.';
+            }
+
+            showScreen('role-screen');
+            startCountdown();
+        }
+
+        function startCountdown() {
+            let countdown = 15;
+            const countdownElement = document.getElementById('countdown-timer');
+            
+            const countdownInterval = setInterval(() => {
+                countdownElement.textContent = countdown;
+                playSound('tick');
+                countdown--;
+                
+                if (countdown < 0) {
+                    clearInterval(countdownInterval);
+                    startGameTimer();
+                }
+            }, 1000);
+        }
+
+        function startGameTimer() {
+            showScreen('game-screen');
+            updateCurrentPlayers();
+            
+            let timeLeft = gameState.gameTimer;
+            const timerElement = document.getElementById('game-timer');
+            
+            const gameInterval = setInterval(() => {
+                const minutes = Math.floor(timeLeft / 60);
+                const seconds = timeLeft % 60;
+                timerElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                
+                if (timeLeft <= 10) {
+                    timerElement.classList.add('warning');
+                    playSound('warning');
+                }
+                
+                timeLeft--;
+                
+                if (timeLeft < 0) {
+                    clearInterval(gameInterval);
+                    showVotingScreen();
+                }
+            }, 1000);
+        }
+
+        function updateCurrentPlayers() {
+            const currentPlayers = document.getElementById('current-players');
+            currentPlayers.innerHTML = '<h3>Players in Game:</h3>';
+            
+            gameState.players.forEach(player => {
+                const playerDiv = document.createElement('div');
+                playerDiv.className = 'player-item';
+                playerDiv.textContent = player;
+                currentPlayers.appendChild(playerDiv);
+            });
+        }
+
+        function showVotingScreen() {
+            showScreen('voting-screen');
+            const votingOptions = document.getElementById('voting-options');
+            votingOptions.innerHTML = '';
+            
+            gameState.players.forEach(player => {
+                if (player !== gameState.playerName) {
+                    const voteButton = document.createElement('div');
+                    voteButton.className = 'vote-button';
+                    voteButton.textContent = player;
+                    voteButton.onclick = () => selectVote(player, voteButton);
+                    votingOptions.appendChild(voteButton);
+                }
+            });
+        }
+
+        let selectedVote = null;
+
+        function selectVote(player, buttonElement) {
+            // Remove previous selection
+            document.querySelectorAll('.vote-button').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+            
+            // Select new vote
+            buttonElement.classList.add('selected');
+            selectedVote = player;
+            document.getElementById('vote-submit').disabled = false;
+        }
+
+        function submitVote() {
+            if (!selectedVote) return;
+            
+            gameState.votes[gameState.playerName] = selectedVote;
+            showResultsScreen();
+        }
+
+        function showResultsScreen() {
+            showScreen('results-screen');
+            
+            // Simulate other players' votes (in real game, this would come from server)
+            if (gameState.isHost) {
+                simulateVotes();
+            }
+            
+            // Show spy reveal
+            document.getElementById('revealed-spy').textContent = gameState.currentSpy;
+            playSound('reveal');
+            
+            // Show voting results
+            const votingResults = document.getElementById('voting-results');
+            votingResults.innerHTML = '<h3>Voting Results:</h3>';
+            
+            const voteCount = {};
+            Object.values(gameState.votes).forEach(vote => {
+                voteCount[vote] = (voteCount[vote] || 0) + 1;
+            });
+            
+            Object.entries(voteCount).forEach(([player, count]) => {
+                const resultDiv = document.createElement('div');
+                resultDiv.className = 'player-item';
+                resultDiv.textContent = `${player}: ${count} vote${count !== 1 ? 's' : ''}`;
+                votingResults.appendChild(resultDiv);
+            });
+            
+            // Calculate and update scores
+            calculateScores();
+            displayScores();
+            
+            if (gameState.isHost) {
+                document.getElementById('host-next').style.display = 'block';
+            }
+        }
+
+        function simulateVotes() {
+            // Simulate votes for other players
+            gameState.players.forEach(player => {
+                if (player !== gameState.playerName && !gameState.votes[player]) {
+                    // 70% chance to vote for spy, 30% random
+                    if (Math.random() < 0.7) {
+                        gameState.votes[player] = gameState.currentSpy;
+                    } else {
+                        const otherPlayers = gameState.players.filter(p => p !== player);
+                        gameState.votes[player] = otherPlayers[Math.floor(Math.random() * otherPlayers.length)];
+                    }
+                }
+            });
+        }
+
+        function calculateScores() {
+            // Reset round scores
+            const roundScores = {};
+            gameState.players.forEach(player => {
+                roundScores[player] = 0;
+            });
+            
+            // Score for correctly guessing spy
+            Object.entries(gameState.votes).forEach(([voter, vote]) => {
+                if (vote === gameState.currentSpy) {
+                    roundScores[voter] += 1;
+                }
+            });
+            
+            // Score for spy (1 point for each player who didn't vote for them)
+            const spyVotes = Object.values(gameState.votes).filter(vote => vote === gameState.currentSpy).length;
+            const totalVotes = Object.keys(gameState.votes).length;
+            roundScores[gameState.currentSpy] = totalVotes - spyVotes;
+            
+            // Add to total scores
+            Object.entries(roundScores).forEach(([player, score]) => {
+                gameState.scores[player] = (gameState.scores[player] || 0) + score;
+            });
+        }
+
+        function displayScores() {
+            const scoresDiv = document.getElementById('current-scores');
+            scoresDiv.innerHTML = '<h3>Current Scores:</h3>';
+            
+            // Sort players by score
+            const sortedPlayers = Object.entries(gameState.scores)
+                .sort(([,a], [,b]) => b - a);
+            
+            sortedPlayers.forEach(([player, score]) => {
+                const scoreDiv = document.createElement('div');
+                scoreDiv.className = 'score-item';
+                scoreDiv.innerHTML = `
+                    <span>${player}</span>
+                    <span>${score} points</span>
+                `;
+                scoresDiv.appendChild(scoreDiv);
+            });
+        }
+
+        function nextRound() {
+            gameState.round++;
+            gameState.votes = {};
+            gameState.currentRole = null;
+            gameState.currentSpy = null;
+            
+            assignRoles();
+            showRoleScreen();
+        }
+
+        function endGame() {
+            alert('Thanks for playing Spy!');
+            resetGame();
+            showScreen('home-screen');
+        }
+
+        function leaveGame() {
+            resetGame();
+            showScreen('home-screen');
+        }
+
+        function resetGame() {
+            gameState = {
+                gameCode: '',
+                isHost: false,
+                playerName: '',
+                players: [],
+                currentRole: null,
+                gameTimer: 120,
+                votes: {},
+                scores: {},
+                round: 1,
+                currentSpy: null,
+                gameActive: false
+            };
+        }
+
+        // Check for game code in URL on page load
+        window.addEventListener('load', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.has('code')) {
+                const gameCode = urlParams.get('code').toUpperCase();
+                document.getElementById('game-code-input').value = gameCode;
+                showScreen('join-game');
+            }
+        });
+    </script>
+</body>
+</html>
