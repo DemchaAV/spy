@@ -397,6 +397,108 @@
             oscillator.stop(context.currentTime + duration);
         }
 
+        // Game data storage functions (using localStorage for cross-tab communication)
+        function saveGameData(gameCode, gameData) {
+            const key = `spy_game_${gameCode}`;
+            const dataWithTimestamp = {
+                ...gameData,
+                lastUpdate: Date.now()
+            };
+            try {
+                // Store in memory for current session
+                window.gameStorage = window.gameStorage || {};
+                window.gameStorage[key] = dataWithTimestamp;
+                
+                // Also try localStorage if available (but not required)
+                if (typeof localStorage !== 'undefined') {
+                    localStorage.setItem(key, JSON.stringify(dataWithTimestamp));
+                }
+            } catch (e) {
+                // localStorage might be disabled, continue with memory storage
+                console.log('Using memory storage only');
+            }
+        }
+        
+        function getGameData(gameCode) {
+            const key = `spy_game_${gameCode}`;
+            
+            // First check memory storage
+            if (window.gameStorage && window.gameStorage[key]) {
+                return window.gameStorage[key];
+            }
+            
+            // Then check localStorage
+            try {
+                if (typeof localStorage !== 'undefined') {
+                    const stored = localStorage.getItem(key);
+                    if (stored) {
+                        const data = JSON.parse(stored);
+                        // Check if data is not too old (5 minutes)
+                        if (Date.now() - data.lastUpdate < 300000) {
+                            return data;
+                        }
+                    }
+                }
+            } catch (e) {
+                console.log('localStorage not available');
+            }
+            
+            return null;
+        }
+        
+        function clearGameData(gameCode) {
+            const key = `spy_game_${gameCode}`;
+            
+            // Clear from memory
+            if (window.gameStorage && window.gameStorage[key]) {
+                delete window.gameStorage[key];
+            }
+            
+            // Clear from localStorage
+            try {
+                if (typeof localStorage !== 'undefined') {
+                    localStorage.removeItem(key);
+                }
+            } catch (e) {
+                // Continue if localStorage not available
+            }
+        }
+        
+        let pollingInterval = null;
+        
+        function startPolling() {
+            if (pollingInterval) clearInterval(pollingInterval);
+            
+            pollingInterval = setInterval(() => {
+                if (gameState.gameCode) {
+                    const gameData = getGameData(gameState.gameCode);
+                    if (gameData) {
+                        // Update player list if changed
+                        if (JSON.stringify(gameState.players) !== JSON.stringify(gameData.players)) {
+                            gameState.players = gameData.players;
+                            gameState.scores = gameData.scores;
+                            updatePlayersList();
+                        }
+                        
+                        // Check if game started
+                        if (gameData.gameStarted && !gameState.gameActive && document.getElementById('lobby').classList.contains('active')) {
+                            // Game started by host
+                            gameState.gameActive = true;
+                            assignRoles();
+                            showRoleScreen();
+                        }
+                    }
+                }
+            }, 1000);
+        }
+        
+        function stopPolling() {
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+                pollingInterval = null;
+            }
+        }
+
         // QR Code generation function
         function generateQRCode(url) {
             const qrContainer = document.getElementById('qrcode');
@@ -451,6 +553,17 @@
             gameState.scores[hostName] = 0;
             gameState.gameTimer = parseInt(document.getElementById('timer-setting').value);
 
+            // Save game data for other players to join
+            const gameData = {
+                hostName: hostName,
+                players: [hostName],
+                scores: {[hostName]: 0},
+                gameTimer: gameState.gameTimer,
+                gameStarted: false,
+                currentRound: 1
+            };
+            saveGameData(gameState.gameCode, gameData);
+
             document.getElementById('display-code').textContent = gameState.gameCode;
             document.getElementById('host-controls').style.display = 'block';
             
@@ -460,6 +573,9 @@
 
             updatePlayersList();
             showScreen('lobby');
+            
+            // Start polling for updates
+            startPolling();
         }
 
         function joinGame() {
@@ -477,17 +593,39 @@
                 return;
             }
 
-            // Simulate joining game (in real implementation, this would be server-side)
+            // Store game data in localStorage for cross-tab communication
+            const existingGame = getGameData(gameCode);
+            if (!existingGame) {
+                alert('Game not found! Please check the game code.');
+                return;
+            }
+
+            // Check if name is already taken
+            if (existingGame.players.includes(playerName)) {
+                alert('Name already taken! Please choose a different name.');
+                return;
+            }
+
+            // Add player to game
+            existingGame.players.push(playerName);
+            existingGame.scores[playerName] = 0;
+            saveGameData(gameCode, existingGame);
+
+            // Set local game state
             gameState.gameCode = gameCode;
             gameState.playerName = playerName;
-            gameState.players.push(playerName);
-            gameState.scores[playerName] = 0;
+            gameState.players = existingGame.players;
+            gameState.scores = existingGame.scores;
+            gameState.gameTimer = existingGame.gameTimer;
 
             document.getElementById('display-code').textContent = gameCode;
             document.getElementById('host-controls').style.display = 'none';
             
             updatePlayersList();
             showScreen('lobby');
+            
+            // Start polling for updates
+            startPolling();
         }
 
         function updatePlayersList() {
@@ -545,6 +683,14 @@
                 return;
             }
 
+            // Update game data to indicate game started
+            const gameData = getGameData(gameState.gameCode);
+            if (gameData) {
+                gameData.gameStarted = true;
+                saveGameData(gameState.gameCode, gameData);
+            }
+
+            gameState.gameActive = true;
             assignRoles();
             showRoleScreen();
         }
@@ -775,11 +921,29 @@
         }
 
         function leaveGame() {
+            stopPolling();
+            
+            // Remove player from game if not host
+            if (!gameState.isHost && gameState.gameCode) {
+                const gameData = getGameData(gameState.gameCode);
+                if (gameData) {
+                    gameData.players = gameData.players.filter(p => p !== gameState.playerName);
+                    delete gameData.scores[gameState.playerName];
+                    saveGameData(gameState.gameCode, gameData);
+                }
+            }
+            
+            // If host leaves, clear the game
+            if (gameState.isHost && gameState.gameCode) {
+                clearGameData(gameState.gameCode);
+            }
+            
             resetGame();
             showScreen('home-screen');
         }
 
         function resetGame() {
+            stopPolling();
             gameState = {
                 gameCode: '',
                 isHost: false,
